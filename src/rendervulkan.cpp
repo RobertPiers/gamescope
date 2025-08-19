@@ -4086,40 +4086,43 @@ std::optional<uint64_t> vulkan_composite( struct FrameInfo_t *frameInfo, gamesco
 	}
 
 	// Apply post-processing with MY_POST shader
-			if (cv_enable_my_post_processing.Get()) // Use ConVar to control when to use it
+	if (cv_enable_my_post_processing.Get()) // Use ConVar to control when to use it
 	{
-		// Create a temporary texture for post-processing output
-		update_tmp_images(currentOutputWidth, currentOutputHeight);
+		// Create a dedicated temporary texture for post-processing (don't interfere with FSR/NIS)
+		// This avoids texture conflicts with the upscaling pipeline
+		if (g_output.tmpPostProcessing == nullptr || 
+			g_output.tmpPostProcessing->width() != currentOutputWidth || 
+			g_output.tmpPostProcessing->height() != currentOutputHeight) {
+			g_output.tmpPostProcessing = new CVulkanTexture();
+			
+			CVulkanTexture::createFlags createFlags;
+			createFlags.bSampled = true;
+			createFlags.bStorage = true;
+			createFlags.bTransferSrc = true;
+			createFlags.bTransferDst = true;
+			
+			bool bSuccess = g_output.tmpPostProcessing->BInit(currentOutputWidth, currentOutputHeight, 1u, DRM_FORMAT_ARGB8888, createFlags, nullptr);
+			if (!bSuccess) {
+				vk_log.errorf("Failed to create post-processing temporary texture");
+			}
+		}
 		
-		// Bind your post-processing shader
-		cmdBuffer->bindPipeline(g_device.pipeline(SHADER_TYPE_MY_POST));
-		cmdBuffer->bindTarget(g_output.tmpOutput);
-		cmdBuffer->bindTexture(0, compositeImage);
+		// Bind your post-processing shader with proper pipeline parameters
+		cmdBuffer->bindPipeline(g_device.pipeline(SHADER_TYPE_MY_POST, 1, 0, 0, GAMESCOPE_APP_TEXTURE_COLORSPACE_SRGB, EOTF_Count));
+		cmdBuffer->bindTarget(g_output.tmpPostProcessing); // Write to dedicated temp texture
+		cmdBuffer->bindTexture(0, compositeImage); // Read from composite image
 		cmdBuffer->setTextureSrgb(0, true);
 		cmdBuffer->setSamplerUnnormalized(0, false);
 		cmdBuffer->setSamplerNearest(0, false);
 		
-		// Upload post-processing parameters as push constants
-		struct PostProcessingParams {
-			float vignette_strength = cv_post_vignette_strength.Get();
-			float vignette_radius = cv_post_vignette_radius.Get();
-			float contrast = cv_post_contrast.Get();
-			float saturation = cv_post_saturation.Get();
-			float brightness = cv_post_brightness.Get();
-			float grain_strength = cv_post_grain_strength.Get();
-			float sharpen_strength = cv_post_sharpen_strength.Get();
-			float bloom_threshold = cv_post_bloom_threshold.Get();
-			float bloom_intensity = cv_post_bloom_intensity.Get();
-		} params;
-		
-		cmdBuffer->uploadConstants<PostProcessingParams>(params);
+		// No push constants needed for simple debug shader
 		
 		// Dispatch your shader (adjust workgroup size based on your shader's needs)
 		const int pixelsPerGroup = 8;
 		cmdBuffer->dispatch(div_roundup(currentOutputWidth, pixelsPerGroup), div_roundup(currentOutputHeight, pixelsPerGroup));
 		
 		// Copy the post-processed result back to the composite image
-		cmdBuffer->copyImage(g_output.tmpOutput, compositeImage);
+		cmdBuffer->copyImage(g_output.tmpPostProcessing, compositeImage);
 	}
 
 	if ( pPipewireTexture != nullptr )

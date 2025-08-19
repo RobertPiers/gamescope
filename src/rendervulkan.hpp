@@ -545,6 +545,9 @@ struct VulkanOutput_t
 	// NIS
 	gamescope::OwningRc<CVulkanTexture> nisScalerImage;
 	gamescope::OwningRc<CVulkanTexture> nisUsmImage;
+
+	// Post-processing
+	gamescope::OwningRc<CVulkanTexture> tmpPostProcessing;
 };
 
 

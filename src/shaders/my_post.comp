@@ -1,130 +1,57 @@
 #version 450
 layout(local_size_x = 8, local_size_y = 8) in;
 
-layout(binding = 0, rgba8) uniform readonly  image2D srcImg;
+// Use correct bindings that match the existing Vulkan descriptor layout:
+// Binding 3: Combined image sampler for input texture (s_samplers[0])
+// Binding 1: Storage image for output target (dst)
+layout(binding = 3) uniform sampler2D srcImg;
 layout(binding = 1, rgba8) uniform writeonly image2D dstImg;
-
-// Post-processing parameters
-layout(push_constant) uniform PostProcessingParams {
-    float vignette_strength;    // 0.0 = no vignette, 1.0 = strong vignette
-    float vignette_radius;      // 0.5 = tight, 1.5 = wide
-    float contrast;             // 0.5 = low contrast, 1.5 = high contrast
-    float saturation;           // 0.0 = grayscale, 2.0 = oversaturated
-    float brightness;           // -0.5 = dark, 0.5 = bright
-    float grain_strength;       // 0.0 = no grain, 0.1 = strong grain
-    float sharpen_strength;     // 0.0 = no sharpen, 1.0 = strong sharpen
-    float bloom_threshold;      // 0.7 = subtle bloom, 0.9 = strong bloom
-    float bloom_intensity;      // 0.0 = no bloom, 1.0 = full bloom
-} params;
-
-// Pseudo-random function for film grain
-float random(vec2 st) {
-    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
-}
-
-// Vignette effect
-vec3 applyVignette(vec3 color, vec2 uv, vec2 resolution) {
-    vec2 center = uv - 0.5;
-    float dist = length(center * resolution / min(resolution.x, resolution.y));
-    float vignette = 1.0 - smoothstep(params.vignette_radius, params.vignette_radius + 0.3, dist);
-    vignette = mix(1.0, vignette, params.vignette_strength);
-    return color * vignette;
-}
-
-// Color grading
-vec3 applyColorGrading(vec3 color) {
-    // Brightness
-    color += params.brightness;
-    
-    // Contrast
-    color = (color - 0.5) * params.contrast + 0.5;
-    
-    // Saturation
-    float luminance = dot(color, vec3(0.299, 0.587, 0.114));
-    color = mix(vec3(luminance), color, params.saturation);
-    
-    return clamp(color, 0.0, 1.0);
-}
-
-// Film grain
-vec3 applyFilmGrain(vec3 color, vec2 uv, vec2 resolution) {
-    if (params.grain_strength <= 0.0) return color;
-    
-    float grain = random(uv * resolution + vec2(0.0, 0.0)) * 2.0 - 1.0;
-    grain *= params.grain_strength;
-    
-    return color + vec3(grain);
-}
-
-// Sharpen effect (simple unsharp mask)
-vec3 applySharpen(vec3 color, vec2 uv, vec2 resolution) {
-    if (params.sharpen_strength <= 0.0) return color;
-    
-    vec2 pixel_size = 1.0 / resolution;
-    vec3 blur = vec3(0.0);
-    
-    // Simple 3x3 blur
-    for (int x = -1; x <= 1; x++) {
-        for (int y = -1; y <= 1; y++) {
-            vec2 offset = vec2(x, y) * pixel_size;
-            blur += imageLoad(srcImg, ivec2((uv + offset) * resolution)).rgb;
-        }
-    }
-    blur /= 9.0;
-    
-    // Unsharp mask
-    vec3 sharp = color + (color - blur) * params.sharpen_strength;
-    return clamp(sharp, 0.0, 1.0);
-}
-
-// Bloom effect
-vec3 applyBloom(vec3 color, vec2 uv, vec2 resolution) {
-    if (params.bloom_intensity <= 0.0) return color;
-    
-    vec2 pixel_size = 1.0 / resolution;
-    vec3 bloom = vec3(0.0);
-    float bloom_weight = 0.0;
-    
-    // Sample bright areas in a 5x5 area
-    for (int x = -2; x <= 2; x++) {
-        for (int y = -2; y <= 2; y++) {
-            vec2 offset = vec2(x, y) * pixel_size;
-            vec3 sample_color = imageLoad(srcImg, ivec2((uv + offset) * resolution)).rgb;
-            
-            // Only bloom bright areas
-            float brightness = dot(sample_color, vec3(0.299, 0.587, 0.114));
-            if (brightness > params.bloom_threshold) {
-                float weight = 1.0 / (1.0 + length(vec2(x, y)) * 0.5);
-                bloom += sample_color * weight;
-                bloom_weight += weight;
-            }
-        }
-    }
-    
-    if (bloom_weight > 0.0) {
-        bloom /= bloom_weight;
-        color += bloom * params.bloom_intensity;
-    }
-    
-    return clamp(color, 0.0, 1.0);
-}
 
 void main() {
     ivec2 pixel_coord = ivec2(gl_GlobalInvocationID.xy);
-    vec2 uv = (vec2(pixel_coord) + 0.5) / vec2(imageSize(srcImg));
-    vec2 resolution = vec2(imageSize(srcImg));
+    vec2 resolution = vec2(imageSize(dstImg));
+    vec2 uv = vec2(pixel_coord) / resolution;
     
-    // Load source color
-    vec4 src_color = imageLoad(srcImg, pixel_coord);
+    // Load original color using texture sampling instead of imageLoad
+    vec4 src_color = texture(srcImg, uv);
     vec3 color = src_color.rgb;
     
-    // Apply post-processing effects
-    color = applySharpen(color, uv, resolution);
-    color = applyBloom(color, uv, resolution);
-    color = applyColorGrading(color);
-    color = applyFilmGrain(color, uv, resolution);
-    color = applyVignette(color, uv, resolution);
+    // Draw "MY_POST WORKING!" indicator patterns
     
-    // Store final result
+    // 1. Red border at the edges (2 pixel thick)
+    if (pixel_coord.x < 2 || pixel_coord.x >= int(resolution.x) - 2 ||
+        pixel_coord.y < 2 || pixel_coord.y >= int(resolution.y) - 2) {
+        color = vec3(1.0, 0.0, 0.0); // Bright red border
+    }
+    
+    // 2. Green corner markers (20x20 pixels)
+    else if ((pixel_coord.x < 20 && pixel_coord.y < 20) ||
+             (pixel_coord.x >= int(resolution.x) - 20 && pixel_coord.y < 20) ||
+             (pixel_coord.x < 20 && pixel_coord.y >= int(resolution.y) - 20) ||
+             (pixel_coord.x >= int(resolution.x) - 20 && pixel_coord.y >= int(resolution.y) - 20)) {
+        color = vec3(0.0, 1.0, 0.0); // Bright green corners
+    }
+    
+    // 3. Blue diagonal line from top-left to bottom-right
+    else if (abs(pixel_coord.x - pixel_coord.y) < 3) {
+        color = mix(color, vec3(0.0, 0.0, 1.0), 0.5); // Semi-transparent blue diagonal
+    }
+    
+    // 4. Yellow center cross (showing resolution center)
+    else if ((abs(pixel_coord.x - int(resolution.x / 2)) < 2 && pixel_coord.y > int(resolution.y / 2) - 50 && pixel_coord.y < int(resolution.y / 2) + 50) ||
+             (abs(pixel_coord.y - int(resolution.y / 2)) < 2 && pixel_coord.x > int(resolution.x / 2) - 50 && pixel_coord.x < int(resolution.x / 2) + 50)) {
+        color = vec3(1.0, 1.0, 0.0); // Bright yellow cross
+    }
+    
+    // 5. Magenta text area indicator (where text would be)
+    else if (pixel_coord.x > 50 && pixel_coord.x < 500 && 
+             pixel_coord.y > 50 && pixel_coord.y < 150) {
+        // Create a simple pattern to simulate "MY_POST WORKING" text area
+        if ((pixel_coord.x / 10) % 2 == 0 && (pixel_coord.y / 10) % 2 == 0) {
+            color = mix(color, vec3(1.0, 0.0, 1.0), 0.3); // Magenta checkerboard pattern
+        }
+    }
+    
+    // Store the result
     imageStore(dstImg, pixel_coord, vec4(color, src_color.a));
 }
