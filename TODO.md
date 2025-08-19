@@ -32,32 +32,6 @@
    - Now independent of upscaling pipeline (FSR/NIS)
    - Shader runs regardless of which upscaling path is taken
 
-8. **Restore original pipeline state** - COMPLETED
-   - Commented out my_post shader integration to restore original pipeline
-   - Commented out Shift+T key bindings in both backends
-   - Original upscaling pipeline (FSR/NIS) now works as intended
-
-## Current Status 🔄
-
-**The original pipeline has been restored and is working correctly:**
-
-- **Super+U**: Toggles FSR upscaling (working normally)
-- **Super+Y**: Toggles NIS upscaling (working normally)  
-- **Super+N**: Toggles nearest neighbor filtering (working normally)
-- **Super+F**: Toggles fullscreen (working normally)
-- **Super+S**: Takes screenshot (working normally)
-- **Super+G**: Toggles keyboard grab (working normally)
-
-## Future Integration Notes 📝
-
-The `my_post` shader code is preserved in comments and can be re-enabled later:
-
-- **Shader integration**: Located in `src/rendervulkan.cpp` around line 4087 (commented out)
-- **Wayland key binding**: Located in `src/Backends/WaylandBackend.cpp` (commented out)
-- **SDL key binding**: Located in `src/Backends/SDLBackend.cpp` (commented out)
-- **Shader file**: `src/shaders/my_post.comp` is ready and properly configured
-- **Header file**: `src/my_post.h` contains compiled SPIR-V data
-
-## Summary
-
-The pipeline has been restored to its original working state. All upscaling features (FSR, NIS) are now working correctly. The `my_post` shader integration has been safely commented out and can be re-enabled in the future when a better integration approach is found.
+8. **Finalize my_post as standalone post-processing pass** - COMPLETED
+   - Runs after final composite on its own pipeline
+   - Does not interfere with FSR or NIS upscalers

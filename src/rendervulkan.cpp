@@ -3412,25 +3412,63 @@ bool vulkan_make_output()
 
 static void update_tmp_images( uint32_t width, uint32_t height )
 {
-	if ( g_output.tmpOutput != nullptr
-			&& width == g_output.tmpOutput->width()
-			&& height == g_output.tmpOutput->height() )
-	{
-		return;
-	}
+        if ( g_output.tmpOutput != nullptr
+                        && width == g_output.tmpOutput->width()
+                        && height == g_output.tmpOutput->height() )
+        {
+                return;
+        }
 
-	CVulkanTexture::createFlags createFlags;
-	createFlags.bSampled = true;
-	createFlags.bStorage = true;
+        CVulkanTexture::createFlags createFlags;
+        createFlags.bSampled = true;
+        createFlags.bStorage = true;
 
-	g_output.tmpOutput = new CVulkanTexture();
-	bool bSuccess = g_output.tmpOutput->BInit( width, height, 1u, DRM_FORMAT_ARGB8888, createFlags, nullptr );
+        g_output.tmpOutput = new CVulkanTexture();
+        bool bSuccess = g_output.tmpOutput->BInit( width, height, 1u, DRM_FORMAT_ARGB8888, createFlags, nullptr );
 
-	if ( !bSuccess )
-	{
-		vk_log.errorf( "failed to create fsr output" );
-		return;
-	}
+        if ( !bSuccess )
+        {
+                vk_log.errorf( "failed to create fsr output" );
+                return;
+        }
+}
+
+static void run_my_post_processing( CVulkanCmdBuffer *cmdBuffer, CVulkanTexture *compositeImage, uint32_t width, uint32_t height )
+{
+        if ( !cv_enable_my_post_processing.Get() )
+                return;
+
+        if ( g_output.tmpPostProcessing == nullptr ||
+             g_output.tmpPostProcessing->width() != width ||
+             g_output.tmpPostProcessing->height() != height )
+        {
+                g_output.tmpPostProcessing = new CVulkanTexture();
+
+                CVulkanTexture::createFlags createFlags;
+                createFlags.bSampled = true;
+                createFlags.bStorage = true;
+                createFlags.bTransferSrc = true;
+                createFlags.bTransferDst = true;
+
+                bool bSuccess = g_output.tmpPostProcessing->BInit( width, height, 1u, DRM_FORMAT_ARGB8888, createFlags, nullptr );
+                if ( !bSuccess )
+                {
+                        vk_log.errorf( "Failed to create post-processing temporary texture" );
+                        return;
+                }
+        }
+
+        cmdBuffer->bindPipeline( g_device.pipeline( SHADER_TYPE_MY_POST, 1, 0, 0, GAMESCOPE_APP_TEXTURE_COLORSPACE_SRGB, EOTF_Count ) );
+        cmdBuffer->bindTarget( g_output.tmpPostProcessing );
+        cmdBuffer->bindTexture( 0, compositeImage );
+        cmdBuffer->setTextureSrgb( 0, true );
+        cmdBuffer->setSamplerUnnormalized( 0, false );
+        cmdBuffer->setSamplerNearest( 0, false );
+
+        const int pixelsPerGroup = 8;
+        cmdBuffer->dispatch( div_roundup( width, pixelsPerGroup ), div_roundup( height, pixelsPerGroup ) );
+
+        cmdBuffer->copyImage( g_output.tmpPostProcessing, compositeImage );
 }
 
 
@@ -4085,42 +4123,8 @@ std::optional<uint64_t> vulkan_composite( struct FrameInfo_t *frameInfo, gamesco
 		cmdBuffer->dispatch(div_roundup(currentOutputWidth, pixelsPerGroup), div_roundup(currentOutputHeight, pixelsPerGroup));
 	}
 
-	// Apply my_post shader as independent post-processing (after final composite, independent of upscaling)
-	if (cv_enable_my_post_processing.Get())
-	{
-		// Create a dedicated temporary texture for post-processing if needed
-		if (g_output.tmpPostProcessing == nullptr || 
-			g_output.tmpPostProcessing->width() != currentOutputWidth || 
-			g_output.tmpPostProcessing->height() != currentOutputHeight) {
-			g_output.tmpPostProcessing = new CVulkanTexture();
-			
-			CVulkanTexture::createFlags createFlags;
-			createFlags.bSampled = true;
-			createFlags.bStorage = true;
-			createFlags.bTransferSrc = true;
-			createFlags.bTransferDst = true;
-			
-			bool bSuccess = g_output.tmpPostProcessing->BInit(currentOutputWidth, currentOutputHeight, 1u, DRM_FORMAT_ARGB8888, createFlags, nullptr);
-			if (!bSuccess) {
-				vk_log.errorf("Failed to create post-processing temporary texture");
-			}
-		}
-		
-		// Apply my_post shader to the final composite image
-		cmdBuffer->bindPipeline(g_device.pipeline(SHADER_TYPE_MY_POST, 1, 0, 0, GAMESCOPE_APP_TEXTURE_COLORSPACE_SRGB, EOTF_Count));
-		cmdBuffer->bindTarget(g_output.tmpPostProcessing); // Write to dedicated temp texture
-		cmdBuffer->bindTexture(0, compositeImage); // Read from final composite image
-		cmdBuffer->setTextureSrgb(0, true);
-		cmdBuffer->setSamplerUnnormalized(0, false);
-		cmdBuffer->setSamplerNearest(0, false);
-		
-		// Dispatch the shader
-		const int pixelsPerGroup = 8;
-		cmdBuffer->dispatch(div_roundup(currentOutputWidth, pixelsPerGroup), div_roundup(currentOutputHeight, pixelsPerGroup));
-		
-		// Copy the post-processed result back to the composite image
-		cmdBuffer->copyImage(g_output.tmpPostProcessing, compositeImage);
-	}
+       // Run optional post-processing pass after compositing
+       run_my_post_processing( cmdBuffer.get(), compositeImage, currentOutputWidth, currentOutputHeight );
 
 	if ( pPipewireTexture != nullptr )
 	{
