@@ -148,6 +148,18 @@ const struct option *gamescope_options = (struct option[]){
 	{ "reshade-effect", required_argument, nullptr, 0 },
 	{ "reshade-technique-idx", required_argument, nullptr, 0 },
 
+	// Post-processing options
+	{ "enable-my-post-processing", no_argument, nullptr, 0 },
+	{ "post-vignette-strength", required_argument, nullptr, 0 },
+	{ "post-vignette-radius", required_argument, nullptr, 0 },
+	{ "post-contrast", required_argument, nullptr, 0 },
+	{ "post-saturation", required_argument, nullptr, 0 },
+	{ "post-brightness", required_argument, nullptr, 0 },
+	{ "post-grain-strength", required_argument, nullptr, 0 },
+	{ "post-sharpen-strength", required_argument, nullptr, 0 },
+	{ "post-bloom-threshold", required_argument, nullptr, 0 },
+	{ "post-bloom-intensity", required_argument, nullptr, 0 },
+
 	// Steam Deck options
 	{ "mura-map", required_argument, nullptr, 0 },
 
@@ -261,6 +273,18 @@ const char usage[] =
 	"Reshade shader options:\n"
 	"  --reshade-effect               sets the name of a reshade shader to use in either /usr/share/gamescope/reshade/Shaders or ~/.local/share/gamescope/reshade/Shaders\n"
 	"  --reshade-technique-idx        sets technique idx to use from the reshade effect\n"
+	"\n"
+	"Post-processing options:\n"
+	"  --enable-my-post-processing    enable custom post-processing shader\n"
+	"  --post-vignette-strength       vignette strength (0.0-1.0, default: 0.3)\n"
+	"  --post-vignette-radius         vignette radius (0.5-1.5, default: 0.8)\n"
+	"  --post-contrast                contrast adjustment (0.5-1.5, default: 1.1)\n"
+	"  --post-saturation              saturation adjustment (0.0-2.0, default: 1.05)\n"
+	"  --post-brightness              brightness adjustment (-0.5-0.5, default: 0.0)\n"
+	"  --post-grain-strength          film grain strength (0.0-0.1, default: 0.02)\n"
+	"  --post-sharpen-strength        sharpen strength (0.0-1.0, default: 0.3)\n"
+	"  --post-bloom-threshold         bloom threshold (0.7-0.9, default: 0.8)\n"
+	"  --post-bloom-intensity         bloom intensity (0.0-1.0, default: 0.2)\n"
 	"\n"
 	"Steam Deck options:\n"
 	"  --mura-map                     Set the mura compensation map to use for the display. Takes in a path to the mura map.\n"
@@ -821,6 +845,26 @@ int main(int argc, char **argv)
 								
 						}
 					}
+				} else if (strcmp(opt_name, "enable-my-post-processing") == 0) {
+					cv_enable_my_post_processing = true;
+				} else if (strcmp(opt_name, "post-vignette-strength") == 0) {
+					cv_post_vignette_strength = parse_float( optarg, opt_name );
+				} else if (strcmp(opt_name, "post-vignette-radius") == 0) {
+					cv_post_vignette_radius = parse_float( optarg, opt_name );
+				} else if (strcmp(opt_name, "post-contrast") == 0) {
+					cv_post_contrast = parse_float( optarg, opt_name );
+				} else if (strcmp(opt_name, "post-saturation") == 0) {
+					cv_post_saturation = parse_float( optarg, opt_name );
+				} else if (strcmp(opt_name, "post-brightness") == 0) {
+					cv_post_brightness = parse_float( optarg, opt_name );
+				} else if (strcmp(opt_name, "post-grain-strength") == 0) {
+					cv_post_grain_strength = parse_float( optarg, opt_name );
+				} else if (strcmp(opt_name, "post-sharpen-strength") == 0) {
+					cv_post_sharpen_strength = parse_float( optarg, opt_name );
+				} else if (strcmp(opt_name, "post-bloom-threshold") == 0) {
+					cv_post_bloom_threshold = parse_float( optarg, opt_name );
+				} else if (strcmp(opt_name, "post-bloom-intensity") == 0) {
+					cv_post_bloom_intensity = parse_float( optarg, opt_name );
 				}
 				break;
 			case '?':

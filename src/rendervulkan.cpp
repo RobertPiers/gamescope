@@ -48,6 +48,7 @@
 #include "cs_nis.h"
 #include "cs_nis_fp16.h"
 #include "cs_rgb_to_nv12.h"
+#include "my_post.h"
 
 #define A_CPU
 #include "shaders/ffx_a.h"
@@ -923,7 +924,11 @@ bool CVulkanDevice::createShaders()
 		SHADER(NIS, cs_nis);
 	}
 	SHADER(RGB_TO_NV12, cs_rgb_to_nv12);
+	SHADER(MY_POST, my_post);
 #undef SHADER
+
+	// Example of how to use your MY_POST shader:
+	// cmdBuffer->bindPipeline(g_device.pipeline(SHADER_TYPE_MY_POST));
 
 	for (uint32_t i = 0; i < shaderInfos.size(); i++)
 	{
@@ -1153,6 +1158,7 @@ void CVulkanDevice::compileAllPipelines()
 	SHADER(EASU, 1, 1, 1);
 	SHADER(NIS, 1, 1, 1);
 	SHADER(RGB_TO_NV12, 1, 1, 1);
+	SHADER(MY_POST, 1, 1, 1);
 #undef SHADER
 
 	for (auto& info : pipelineInfos) {
@@ -4077,6 +4083,43 @@ std::optional<uint64_t> vulkan_composite( struct FrameInfo_t *frameInfo, gamesco
 		const int pixelsPerGroup = 8;
 
 		cmdBuffer->dispatch(div_roundup(currentOutputWidth, pixelsPerGroup), div_roundup(currentOutputHeight, pixelsPerGroup));
+	}
+
+	// Apply post-processing with MY_POST shader
+			if (cv_enable_my_post_processing.Get()) // Use ConVar to control when to use it
+	{
+		// Create a temporary texture for post-processing output
+		update_tmp_images(currentOutputWidth, currentOutputHeight);
+		
+		// Bind your post-processing shader
+		cmdBuffer->bindPipeline(g_device.pipeline(SHADER_TYPE_MY_POST));
+		cmdBuffer->bindTarget(g_output.tmpOutput);
+		cmdBuffer->bindTexture(0, compositeImage);
+		cmdBuffer->setTextureSrgb(0, true);
+		cmdBuffer->setSamplerUnnormalized(0, false);
+		cmdBuffer->setSamplerNearest(0, false);
+		
+		// Upload post-processing parameters as push constants
+		struct PostProcessingParams {
+			float vignette_strength = cv_post_vignette_strength.Get();
+			float vignette_radius = cv_post_vignette_radius.Get();
+			float contrast = cv_post_contrast.Get();
+			float saturation = cv_post_saturation.Get();
+			float brightness = cv_post_brightness.Get();
+			float grain_strength = cv_post_grain_strength.Get();
+			float sharpen_strength = cv_post_sharpen_strength.Get();
+			float bloom_threshold = cv_post_bloom_threshold.Get();
+			float bloom_intensity = cv_post_bloom_intensity.Get();
+		} params;
+		
+		cmdBuffer->uploadConstants<PostProcessingParams>(params);
+		
+		// Dispatch your shader (adjust workgroup size based on your shader's needs)
+		const int pixelsPerGroup = 8;
+		cmdBuffer->dispatch(div_roundup(currentOutputWidth, pixelsPerGroup), div_roundup(currentOutputHeight, pixelsPerGroup));
+		
+		// Copy the post-processed result back to the composite image
+		cmdBuffer->copyImage(g_output.tmpOutput, compositeImage);
 	}
 
 	if ( pPipewireTexture != nullptr )

@@ -129,8 +129,21 @@ LogScope xwm_log("xwm");
 LogScope g_WaitableLog("waitable");
 
 gamescope::ConVar<bool> cv_overlay_unmultiplied_alpha{ "overlay_unmultiplied_alpha", false };
+gamescope::ConVar<bool> cv_enable_my_post_processing{ "enable_my_post_processing", false, "Enable custom post-processing shader" };
+
+// Post-processing effect parameters
+gamescope::ConVar<float> cv_post_vignette_strength{ "post_vignette_strength", 0.3f, "Vignette strength (0.0-1.0)" };
+gamescope::ConVar<float> cv_post_vignette_radius{ "post_vignette_radius", 0.8f, "Vignette radius (0.5-1.5)" };
+gamescope::ConVar<float> cv_post_contrast{ "post_contrast", 1.1f, "Contrast adjustment (0.5-1.5)" };
+gamescope::ConVar<float> cv_post_saturation{ "post_saturation", 1.05f, "Saturation adjustment (0.0-2.0)" };
+gamescope::ConVar<float> cv_post_brightness{ "post_brightness", 0.0f, "Brightness adjustment (-0.5-0.5)" };
+gamescope::ConVar<float> cv_post_grain_strength{ "post_grain_strength", 0.02f, "Film grain strength (0.0-0.1)" };
+gamescope::ConVar<float> cv_post_sharpen_strength{ "post_sharpen_strength", 0.3f, "Sharpen strength (0.0-1.0)" };
+gamescope::ConVar<float> cv_post_bloom_threshold{ "post_bloom_threshold", 0.8f, "Bloom threshold (0.7-0.9)" };
+gamescope::ConVar<float> cv_post_bloom_intensity{ "post_bloom_intensity", 0.2f, "Bloom intensity (0.0-1.0)" };
 
 bool g_bWasPartialComposite = false;
+bool g_bEnableMyPostProcessing = false;
 
 bool ShouldDrawCursor();
 

@@ -41,6 +41,19 @@ static const uint32_t g_zposMuraCorrection = 5;
 extern bool g_bHDRItmEnable;
 extern bool g_bForceHDRSupportDebug;
 
+extern gamescope::ConVar<bool> cv_enable_my_post_processing;
+
+// Post-processing effect parameters
+extern gamescope::ConVar<float> cv_post_vignette_strength;
+extern gamescope::ConVar<float> cv_post_vignette_radius;
+extern gamescope::ConVar<float> cv_post_contrast;
+extern gamescope::ConVar<float> cv_post_saturation;
+extern gamescope::ConVar<float> cv_post_brightness;
+extern gamescope::ConVar<float> cv_post_grain_strength;
+extern gamescope::ConVar<float> cv_post_sharpen_strength;
+extern gamescope::ConVar<float> cv_post_bloom_threshold;
+extern gamescope::ConVar<float> cv_post_bloom_intensity;
+
 extern EStreamColorspace g_ForcedNV12ColorSpace;
 
 struct CursorBarrierInfo
