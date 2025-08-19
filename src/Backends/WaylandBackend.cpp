@@ -2836,6 +2836,22 @@ namespace gamescope
 
     void CWaylandInputThread::HandleKey( uint32_t uKey, bool bPressed )
     {
+        // Handle Shift+T for my_post shader toggle
+        if ( ( m_uKeyModifiers & m_uModMask[ GAMESCOPE_WAYLAND_MOD_SHIFT ] ) && !( m_uKeyModifiers & m_uModMask[ GAMESCOPE_WAYLAND_MOD_META ] ) )
+        {
+            switch ( uKey )
+            {
+                case KEY_T:
+                {
+                    if ( !bPressed )
+                    {
+                        cv_enable_my_post_processing = !cv_enable_my_post_processing;
+                    }
+                    return;
+                }
+            }
+        }
+        
         if ( m_uKeyModifiers & m_uModMask[ GAMESCOPE_WAYLAND_MOD_META ] )
         {
             switch ( uKey )

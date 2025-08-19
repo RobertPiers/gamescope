@@ -743,11 +743,30 @@ namespace gamescope
 							break;
 						}
 					}
+					// If this keydown event is shift + T, consume it
+					if ( ( event.key.keysym.mod & KMOD_LSHIFT ) || ( event.key.keysym.mod & KMOD_RSHIFT ) )
+					{
+						uint32_t key = SDLScancodeToLinuxKey( event.key.keysym.scancode );
+						if ( key == KEY_T )
+						{
+							break;
+						}
+					}
 				}
 				[[fallthrough]];
 				case SDL_KEYUP:
 				{
 					uint32_t key = SDLScancodeToLinuxKey( event.key.keysym.scancode );
+
+					// Handle Shift+T for my_post shader toggle
+					if ( event.type == SDL_KEYUP && ( ( event.key.keysym.mod & KMOD_LSHIFT ) || ( event.key.keysym.mod & KMOD_RSHIFT ) ) && !( event.key.keysym.mod & KMOD_LGUI ) )
+					{
+						if ( key == KEY_T )
+						{
+							cv_enable_my_post_processing = !cv_enable_my_post_processing;
+							break;
+						}
+					}
 
 					if ( event.type == SDL_KEYUP && ( event.key.keysym.mod & KMOD_LGUI ) )
 					{

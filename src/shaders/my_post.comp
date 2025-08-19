@@ -1,19 +1,19 @@
-#version 450
-layout(local_size_x = 8, local_size_y = 8) in;
+#version 460
 
-// Use correct bindings that match the existing Vulkan descriptor layout:
-// Binding 3: Combined image sampler for input texture (s_samplers[0])
-// Binding 1: Storage image for output target (dst)
-layout(binding = 3) uniform sampler2D srcImg;
-layout(binding = 1, rgba8) uniform writeonly image2D dstImg;
+#extension GL_GOOGLE_include_directive : require
+
+// Include the descriptor set header to get access to the binding constants
+#include "descriptor_set.h"
+
+layout(local_size_x = 8, local_size_y = 8) in;
 
 void main() {
     ivec2 pixel_coord = ivec2(gl_GlobalInvocationID.xy);
-    vec2 resolution = vec2(imageSize(dstImg));
+    vec2 resolution = vec2(imageSize(dst));
     vec2 uv = vec2(pixel_coord) / resolution;
     
-    // Load original color using texture sampling instead of imageLoad
-    vec4 src_color = texture(srcImg, uv);
+    // Load original color using the first sampler in the array (s_samplers[0])
+    vec4 src_color = texture(s_samplers[0], uv);
     vec3 color = src_color.rgb;
     
     // Draw "MY_POST WORKING!" indicator patterns
@@ -53,5 +53,5 @@ void main() {
     }
     
     // Store the result
-    imageStore(dstImg, pixel_coord, vec4(color, src_color.a));
+    imageStore(dst, pixel_coord, vec4(color, src_color.a));
 }

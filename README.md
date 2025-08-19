@@ -40,6 +40,7 @@ meson install -C build/ --skip-subprojects
 * **Super + O** : Decrease FSR sharpness by 1
 * **Super + S** : Take screenshot (currently goes to `/tmp/gamescope_$DATE.png`)
 * **Super + G** : Toggle keyboard grab
+* **Shift + T** : Toggle my_post post-processing
 
 ## Examples
 

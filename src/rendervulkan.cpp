@@ -4085,11 +4085,10 @@ std::optional<uint64_t> vulkan_composite( struct FrameInfo_t *frameInfo, gamesco
 		cmdBuffer->dispatch(div_roundup(currentOutputWidth, pixelsPerGroup), div_roundup(currentOutputHeight, pixelsPerGroup));
 	}
 
-	// Apply post-processing with MY_POST shader
-	if (cv_enable_my_post_processing.Get()) // Use ConVar to control when to use it
+	// Apply my_post shader as independent post-processing (after final composite, independent of upscaling)
+	if (cv_enable_my_post_processing.Get())
 	{
-		// Create a dedicated temporary texture for post-processing (don't interfere with FSR/NIS)
-		// This avoids texture conflicts with the upscaling pipeline
+		// Create a dedicated temporary texture for post-processing if needed
 		if (g_output.tmpPostProcessing == nullptr || 
 			g_output.tmpPostProcessing->width() != currentOutputWidth || 
 			g_output.tmpPostProcessing->height() != currentOutputHeight) {
@@ -4107,17 +4106,15 @@ std::optional<uint64_t> vulkan_composite( struct FrameInfo_t *frameInfo, gamesco
 			}
 		}
 		
-		// Bind your post-processing shader with proper pipeline parameters
+		// Apply my_post shader to the final composite image
 		cmdBuffer->bindPipeline(g_device.pipeline(SHADER_TYPE_MY_POST, 1, 0, 0, GAMESCOPE_APP_TEXTURE_COLORSPACE_SRGB, EOTF_Count));
 		cmdBuffer->bindTarget(g_output.tmpPostProcessing); // Write to dedicated temp texture
-		cmdBuffer->bindTexture(0, compositeImage); // Read from composite image
+		cmdBuffer->bindTexture(0, compositeImage); // Read from final composite image
 		cmdBuffer->setTextureSrgb(0, true);
 		cmdBuffer->setSamplerUnnormalized(0, false);
 		cmdBuffer->setSamplerNearest(0, false);
 		
-		// No push constants needed for simple debug shader
-		
-		// Dispatch your shader (adjust workgroup size based on your shader's needs)
+		// Dispatch the shader
 		const int pixelsPerGroup = 8;
 		cmdBuffer->dispatch(div_roundup(currentOutputWidth, pixelsPerGroup), div_roundup(currentOutputHeight, pixelsPerGroup));
 		
